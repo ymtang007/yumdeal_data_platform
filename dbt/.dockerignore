@@ -1,0 +1,20 @@
+# Git
+.git
+.gitignore
+
+# dbt Artifacts 
+target/
+dbt_packages/
+logs/
+
+# Python Cache
+__pycache__
+*.pyc
+
+# Configs 
+profiles.yml
+.user.yml
+
+# Editor config
+.vscode
+.idea

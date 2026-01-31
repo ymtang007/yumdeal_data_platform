@@ -1,0 +1,125 @@
+# ===============================================
+# 🔐 Secrets & Environment Variables (最重要！)
+# ===============================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# 忽略所有文件夹下的 .env (防止 fastapi/.env 或 airflow/.env 被提交)
+**/.env
+**/.env.*
+
+# ===============================================
+# 🐍 Python / FastAPI (后端)
+# ===============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv/
+
+# 测试覆盖率
+.coverage
+htmlcov/
+.pytest_cache/
+
+# ===============================================
+# 💨 Airflow (调度)
+# ===============================================
+airflow.db
+airflow.cfg
+unittests.cfg
+webserver_config.py
+standalone_admin_password.txt
+airflow-webserver.pid
+# Airflow 日志非常大，必须忽略
+logs/
+airflow/logs/
+
+# ===============================================
+# 🧱 dbt (数据转换)
+# ===============================================
+dbt_packages/
+# 忽略编译后的 SQL 和运行结果
+target/
+dbt_modules/
+# 本地开发的 profile 覆盖文件
+profiles.yml
+.user.yml
+
+# ===============================================
+# 🧩 Chrome Extension / Node (前端)
+# ===============================================
+# 即使现在没用 npm，以后引入打包工具时会用到
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# 临时生成的扩展包
+*.crx
+*.zip
+
+# ===============================================
+# 🐳 Docker
+# ===============================================
+# 如果你有本地特定的覆盖配置
+docker-compose.override.yml
+# 本地挂载的数据卷 (防止把测试数据库传上去)
+postgres_data/
+
+# ===============================================
+# 🏗️ Terraform (IaC)
+# ===============================================
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+*.tfplan
+.terraform.lock.hcl
+# 🆕 新增：防止备份文件泄露公钥或配置
+*.tf.backup
+# Terraform export artifacts
+aztfexportResourceMapping.json
+aztfexportSkippedResources.txt
+
+# ===============================================
+# 🖥️ OS & IDE (系统文件)
+# ===============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+
+# IDE 配置
+.idea/
+.vscode/
+*.swp
+*.swo
+*.iml

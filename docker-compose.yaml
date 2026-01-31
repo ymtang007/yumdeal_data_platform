@@ -1,0 +1,133 @@
+version: '3.8'
+
+# --- 1. Airflow Common Configuration ---
+# This section defines settings shared by all Airflow services (Webserver, Scheduler, Init).
+x-airflow-common:
+  &airflow-common
+  build: ./airflow
+  env_file:
+    - .env  # Automatically load all variables from your .env file
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    # Connection string for Airflow's internal Metadata Database (Postgres)
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    DBT_PROFILES_DIR: /opt/airflow/dbt
+    
+    # 👇 [CRITICAL] Snowflake Connection for Airflow
+    # This constructs the connection string dynamically using variables from your .env file.
+    # Airflow will see a connection named 'snowflake_default'.
+    # Syntax: snowflake://user:password@account/database/schema?warehouse=...&role=...
+    AIRFLOW_CONN_SNOWFLAKE_DEFAULT: snowflake://${SNOWFLAKE_USER}:${SNOWFLAKE_PASSWORD}@${SNOWFLAKE_ACCOUNT}/${SNOWFLAKE_DATABASE}/raw?warehouse=${SNOWFLAKE_WAREHOUSE}&role=${SNOWFLAKE_ROLE}&account=${SNOWFLAKE_ACCOUNT}
+
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - ./airflow/plugins:/opt/airflow/plugins
+    - ./dbt:/opt/airflow/dbt
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  # --- 2. Database (PostgreSQL) ---
+  # Stores Airflow metadata (users, task history, etc.)
+  postgres:
+    image: postgres:16-alpine
+    container_name: yumdeal_postgres
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env # Loads POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./pgsql/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- 3. Backend (FastAPI) ---
+  fastapi:
+    build: ./fastapi
+    container_name: yumdeal_fastapi
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./fastapi/app:/app/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env # Loads AZURE_STORAGE_ACCOUNT, BLOB_CONTAINER_NAME, etc.
+
+  # --- 4. Cloudflare Tunnel ---
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: yumdeal_tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      # Ideally, add TUNNEL_TOKEN to your .env file as well for security.
+      # For now, keeping it here as requested previously.
+      - TUNNEL_TOKEN=eyJhIjoiNjdlZGY1ZWUyZGEyNTQ2ZmE4ZmNlYjhlOTg5ZGY1OGQiLCJ0IjoiOWFjMTEzZWQtYmM5NC00ZmE5LTg2N2YtYzhmMTZkMDdjNTY2IiwicyI6IlpqSXlPR1E1WWpFdE9EZzJZaTAwTnpBekxUaGlaRFV0TW1NelpqQm1ZMlpsTmpJeCJ9
+    depends_on:
+      - fastapi
+
+  # --- 5. dbt (Local Debugging Utility) ---
+  # Container for manually running dbt commands via CLI if needed.
+  # Airflow has its own internal dbt, but this is useful for development.
+  dbt:
+      image: ghcr.io/dbt-labs/dbt-snowflake:1.7.2
+      container_name: yumdeal_dbt
+      volumes:
+        - ./dbt:/usr/app/dbt
+        # Mount profiles.yml so it can access env vars if configured
+        - ./dbt/profiles.yml:/root/.dbt/profiles.yml
+      env_file:
+        - .env # Passes Snowflake credentials to dbt
+      entrypoint: ["/bin/bash", "-c"]
+      command: ["tail -f /dev/null"]
+
+  # --- 6. Airflow Services ---
+  airflow-init:
+    <<: *airflow-common
+    container_name: yumdeal_airflow_init
+    command: version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: 'admin'
+      _AIRFLOW_WWW_USER_PASSWORD: 'admin'
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: yumdeal_airflow_webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: yumdeal_airflow_scheduler
+    command: scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
