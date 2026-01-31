@@ -1,0 +1,22 @@
+name: 'yumdeal'
+version: '1.0.0'
+config-version: 2
+
+profile: 'yumdeal'  # This line must match the profile name in profiles.yml
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"  # output paths
+clean-targets:         # directories to be removed by 'dbt clean'
+  - "target"
+  - "dbt_packages"
+
+models:
+  yumdeal:
+    # Configured by materialization type generally
+    +materialized: view

@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: yumdeal       
+    database: yumdeal_db
+    schema: raw
+    tables:
+      - name: deals_raw 
